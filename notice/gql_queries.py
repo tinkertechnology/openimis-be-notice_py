@@ -1,10 +1,14 @@
 import graphene
-from core import prefix_filterset, ExtendedConnection
+from core import prefix_filterset, ExtendedConnection,filter_validity
 from graphene_django import DjangoObjectType
 from django.utils.translation import gettext as _
 import graphene
 from graphene_django import DjangoObjectType
 from location.schema import HealthFacilityGQLType
+from location import models as location_models
+from core import models as core_models
+from graphql import ResolveInfo
+from django.db.models import Q  # Add this import at the top for Q objects
 
 from .models import Notice, NoticeAttachment
 
@@ -45,6 +49,31 @@ class NoticeGQLType(DjangoObjectType):
     # Count the number of attachments related to this notice
         return self.attachments.count()
 
+    @classmethod
+    def get_queryset(cls, queryset, info):
+        """
+        Default queryset filtering:
+        1. Apply validity filter (validity_to__isnull=True).
+        2. If health_facility is null, show to all; otherwise, filter by user's health facility (row security).
+        3. Only show notices where current date is after publish_start_date (if set).
+        """
+        # 1. Apply validity filter
+        # queryset = queryset.filter(*filter_validity())
+        # import pdb; pdb.set_trace()
+        from django.conf import settings
+        from datetime import datetime
+        user = info.context.user
+        
+        # 2. Row-level security based on user and health_facility
+        current_date = datetime.now()
+        if settings.ROW_SECURITY:
+            # TechnicalUsers don't have health_facility_id attribute
+            if hasattr(user._u, 'health_facility_id') and user._u.health_facility_id:
+                # Filter notices where health_facility matches user's HF or is null
+                queryset = queryset.filter(
+                    Q(health_facility_id=user._u.health_facility_id) | Q(health_facility__isnull=True | Q(publish_start_date__isnull=True) | Q(publish_start_date__gte=current_date)
+                ))
+        return queryset
 
 class NoticeAttachmentGQLType(DjangoObjectType):
     doc = graphene.String(source='document')

@@ -22,6 +22,8 @@ class CreateNoticeMutation(OpenIMISMutation):
         description = graphene.String(required=True)
         priority = graphene.String(required=True)
         health_facility_id = graphene.Int(required=True)  
+        schedule_publish = graphene.Boolean(required=False)  # New field
+        publish_start_date = graphene.DateTime(required=False)  # New field
 
     @classmethod
     def async_mutate(cls, user, **data):
@@ -36,7 +38,9 @@ class CreateNoticeMutation(OpenIMISMutation):
                 title=data["title"],
                 description=data["description"],
                 priority=data["priority"],
-                health_facility=health_facility
+                health_facility=health_facility,
+                schedule_publish=data.get("schedule_publish", False),  # Default to False if not provided
+                publish_start_date=data.get("publish_start_date"),  # Can be None if not provided
             )
             notice.save()
             return None  # Success, no errors

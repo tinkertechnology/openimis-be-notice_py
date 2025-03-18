@@ -21,9 +21,19 @@ class Notice(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     priority = models.CharField(max_length=6, choices=PRIORITY_CHOICES, default='MEDIUM')
-    health_facility = models.ForeignKey(HealthFacility, on_delete=models.CASCADE, related_name='notices')
+    health_facility = models.ForeignKey(
+        HealthFacility,
+        on_delete=models.CASCADE,
+        related_name='notices',
+        null=True,  
+        blank=True  
+    )    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    schedule_publish = models.BooleanField(default=False)  
+    publish_start_date = models.DateTimeField(null=True, blank=True)  
+    validity_from = models.DateTimeField(auto_now_add=True)
+    validity_to = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -34,28 +44,6 @@ class Notice(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self.send_notification()
-
-    def send_notification(self):
-        """Send email or SMS to health facility if configured."""
-        hf = self.health_facility
-        if not hf:
-            return
-
-        # Check if email or SMS is enabled in settings
-        if getattr(settings, "NOTICE_EMAIL_ENABLED", False) and hf.email:
-            self.send_email_notification(hf.email)
-        if getattr(settings, "NOTICE_SMS_ENABLED", False) and hf.phone:
-            self.send_sms_notification(hf.phone)
-
-    def send_email_notification(self, email):
-        subject = f"New Notice: {self.title}"
-        message = f"Priority: {self.priority}\nDescription: {self.description}"
-        from_email = settings.DEFAULT_FROM_EMAIL
-        try:
-            send_mail(subject, message, from_email, [email], fail_silently=False)
-        except Exception as e:
-            print(f"Failed to send email: {e}")
 
 
 
