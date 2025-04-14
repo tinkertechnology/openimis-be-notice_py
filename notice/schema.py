@@ -15,6 +15,7 @@ from core.schema import signal_mutation_module_validate
 
 
 class Query(graphene.ObjectType):
+    request_logs = OrderedDjangoFilterConnectionField(RequestLogGQLType)
     notices = OrderedDjangoFilterConnectionField(
         NoticeGQLType,
     )

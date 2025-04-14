@@ -73,7 +73,7 @@ class NoticeGQLType(DjangoObjectType):
                 queryset = queryset.filter(
                     Q(health_facility_id=user._u.health_facility_id) | Q(health_facility__isnull=True | Q(publish_start_date__isnull=True) | Q(publish_start_date__gte=current_date)
                 ))
-        return queryset
+        return queryset.order_by('-created_at')
 
 class NoticeAttachmentGQLType(DjangoObjectType):
     doc = graphene.String(source='document')
@@ -91,5 +91,26 @@ class NoticeAttachmentGQLType(DjangoObjectType):
             "mime": ["exact", "icontains"],
             "url": ["exact", "icontains"],
             **prefix_filterset("notice__", NoticeGQLType._meta.filter_fields),
+        }
+        connection_class = ExtendedConnection
+
+
+
+class RequestLogGQLType(DjangoObjectType):
+    class Meta:
+        from .models import RequestLog
+        model = RequestLog
+        interfaces = (graphene.relay.Node,)
+        fields = '__all__'
+        filter_fields = {
+            "id": ["exact"],
+            "app_name": ["exact", "icontains"],  # Filter by app_name
+            "route_name": ["exact", "icontains"],
+            "method": ["exact"],
+            "path": ["exact", "icontains"],
+            "status_code": ["exact", "lt", "lte", "gt", "gte"],
+            "duration_ms": ["exact", "lt", "lte", "gt", "gte"],
+            "user": ["exact", "icontains"],
+            "timestamp": ["exact", "lt", "lte", "gt", "gte"],
         }
         connection_class = ExtendedConnection

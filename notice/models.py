@@ -47,15 +47,7 @@ class Notice(models.Model):
 
 
 
-class NoticeMutation(core_models.UUIDModel, core_models.ObjectMutation):
-    notice = models.ForeignKey(Notice, models.DO_NOTHING,
-                                 related_name='mutations')
-    mutation = models.ForeignKey(
-        core_models.MutationLog, models.DO_NOTHING, related_name='category')
 
-    class Meta:
-        managed = True
-        db_table = "tbl_noticeMutations"
 
 
 
@@ -84,3 +76,28 @@ class NoticeAttachment(core_models.UUIDModel, core_models.UUIDVersionedModel):
 
     def __str__(self):
         return f"{self.title or self.filename or 'Unnamed'} - {self.notice.title}"
+
+
+class NoticeMutation(core_models.UUIDModel, core_models.ObjectMutation):
+    notice = models.ForeignKey(Notice, models.DO_NOTHING,
+                                 related_name='mutations')
+    mutation = models.ForeignKey(
+        core_models.MutationLog, models.DO_NOTHING, related_name='category')
+
+    class Meta:
+        managed = True
+        db_table = "tbl_noticeMutations"
+
+
+
+class RequestLog(models.Model):
+    timestamp = models.DateTimeField(auto_now_add=True)
+    route_name = models.CharField(max_length=255)
+    method = models.CharField(max_length=10)
+    app_name = models.CharField(max_length=100, blank=True, null=True)  # New field
+    path = models.CharField(max_length=2000)
+    status_code = models.IntegerField()
+    duration_ms = models.FloatField()  # Duration in milliseconds
+    request_data = models.JSONField()
+    response_data = models.JSONField()
+    user = models.CharField(max_length=255, blank=True, null=True)
