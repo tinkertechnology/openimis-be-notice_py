@@ -30,6 +30,7 @@ class NoticePriority(graphene.Enum):
 
 class NoticeGQLType(DjangoObjectType):
     attachment_count = graphene.Int()
+    priority = NoticePriority()
     class Meta:
         model = Notice
         interfaces = (graphene.relay.Node,)
@@ -57,22 +58,22 @@ class NoticeGQLType(DjangoObjectType):
         2. If health_facility is null, show to all; otherwise, filter by user's health facility (row security).
         3. Only show notices where current date is after publish_start_date (if set).
         """
-        # 1. Apply validity filter
-        # queryset = queryset.filter(*filter_validity())
-        # import pdb; pdb.set_trace()
+        user = info.context.user
         from django.conf import settings
         from datetime import datetime
         user = info.context.user
-        
-        # 2. Row-level security based on user and health_facility
         current_date = datetime.now()
         if settings.ROW_SECURITY:
             # TechnicalUsers don't have health_facility_id attribute
             if hasattr(user._u, 'health_facility_id') and user._u.health_facility_id:
                 # Filter notices where health_facility matches user's HF or is null
                 queryset = queryset.filter(
-                    Q(health_facility_id=user._u.health_facility_id) | Q(health_facility__isnull=True | Q(publish_start_date__isnull=True) | Q(publish_start_date__gte=current_date)
-                ))
+                    Q(health_facility_id=user._u.health_facility_id) |
+                    Q(health_facility__isnull=True) |
+                    Q(publish_start_date__isnull=True) |
+                    Q(publish_start_date__gte=current_date)
+                )
+
         return queryset.order_by('-created_at')
 
 class NoticeAttachmentGQLType(DjangoObjectType):
@@ -94,23 +95,3 @@ class NoticeAttachmentGQLType(DjangoObjectType):
         }
         connection_class = ExtendedConnection
 
-
-
-class RequestLogGQLType(DjangoObjectType):
-    class Meta:
-        from .models import RequestLog
-        model = RequestLog
-        interfaces = (graphene.relay.Node,)
-        fields = '__all__'
-        filter_fields = {
-            "id": ["exact"],
-            "app_name": ["exact", "icontains"],  # Filter by app_name
-            "route_name": ["exact", "icontains"],
-            "method": ["exact"],
-            "path": ["exact", "icontains"],
-            "status_code": ["exact", "lt", "lte", "gt", "gte"],
-            "duration_ms": ["exact", "lt", "lte", "gt", "gte"],
-            "user": ["exact", "icontains"],
-            "timestamp": ["exact", "lt", "lte", "gt", "gte"],
-        }
-        connection_class = ExtendedConnection

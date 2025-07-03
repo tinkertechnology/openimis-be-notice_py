@@ -6,9 +6,6 @@ from django.contrib.auth.models import User
 from location.models import HealthFacility 
 from core import fields, TimeUtils, models as core_models
 
-
-
-
 class Notice(models.Model):
     PRIORITY_CHOICES = (
         ('LOW', 'Low'),
@@ -44,11 +41,6 @@ class Notice(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-
-
-
-
-
 
 
 class NoticeAttachment(core_models.UUIDModel, core_models.UUIDVersionedModel):
@@ -87,17 +79,3 @@ class NoticeMutation(core_models.UUIDModel, core_models.ObjectMutation):
     class Meta:
         managed = True
         db_table = "tbl_noticeMutations"
-
-
-
-class RequestLog(models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)
-    route_name = models.CharField(max_length=255)
-    method = models.CharField(max_length=10)
-    app_name = models.CharField(max_length=100, blank=True, null=True)  # New field
-    path = models.CharField(max_length=2000)
-    status_code = models.IntegerField()
-    duration_ms = models.FloatField()  # Duration in milliseconds
-    request_data = models.JSONField()
-    response_data = models.JSONField()
-    user = models.CharField(max_length=255, blank=True, null=True)

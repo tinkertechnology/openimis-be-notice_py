@@ -1,5 +1,4 @@
 from enum import Enum
-
 from django.db.models import OuterRef, Subquery, Avg, Q
 import graphene_django_optimizer as gql_optimizer
 from core.schema import OrderedDjangoFilterConnectionField
@@ -8,14 +7,16 @@ from django.conf import settings
 from django.utils.translation import gettext as _
 from django.core.exceptions import PermissionDenied
 from .gql_queries import *
-from .gql_mutations import CreateNoticeMutation, UpdateNoticeMutation, DeleteNoticeMutation, ToggleNoticeStatusMutation, SendNoticeEmailMutation, SendNoticeSMSMutation,\
-    CreateNoticeAttachmentMutation, UpdateNoticeAttachmentMutation, DeleteNoticeAttachmentMutation
+from .gql_mutations import CreateNoticeMutation, UpdateNoticeMutation, DeleteNoticeMutation, \
+                 ToggleNoticeStatusMutation, SendNoticeEmailMutation, SendNoticeSMSMutation,\
+                    CreateNoticeAttachmentMutation, UpdateNoticeAttachmentMutation, \
+                     DeleteNoticeAttachmentMutation
 from .models import NoticeMutation
 from core.schema import signal_mutation_module_validate
+from graphene import ObjectType, List
 
 
 class Query(graphene.ObjectType):
-    request_logs = OrderedDjangoFilterConnectionField(RequestLogGQLType)
     notices = OrderedDjangoFilterConnectionField(
         NoticeGQLType,
     )
@@ -27,7 +28,6 @@ class Query(graphene.ObjectType):
         if not info.context.user.has_perms("notice.view_notice_attachment"):
             raise PermissionDenied("Unauthorized")
         queryset = NoticeAttachment.objects.filter(*filter_validity())
-        # Apply additional filters from kwargs if provided (e.g., notice_Uuid)
         if "notice_Uuid" in kwargs:
             queryset = queryset.filter(notice__uuid=kwargs["notice_Uuid"])
         return queryset
@@ -52,10 +52,7 @@ def on_notice_mutation(**kwargs):
     if not uuids:
         return []  # No notices impacted
 
-    # Fetch impacted notices
     impacted_notices = Notice.objects.filter(uuid__in=uuids).all()
-    
-    # Log each notice mutation
     for notice in impacted_notices:
         NoticeMutation.objects.create(
             notice=notice,

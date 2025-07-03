@@ -9,21 +9,48 @@ from location.models import HealthFacility
 from django.core.mail import send_mail
 import requests
 import os
-
+import base64
+from graphene import String, Int, Boolean, Date, List, InputObjectType
+from celery import shared_task
 logger = logging.getLogger(__name__)
 
-# Mutations
+
+
+
+@shared_task
+def send_notice_email(notice_id):
+    notice = Notice.objects.get(id=notice_id)
+    send_mail(
+        subject=f"Notice: {notice.title}",
+        message=notice.description,
+        from_email="no-reply@openimis.org",
+        recipient_list=["test.openimis.org"],
+        fail_silently=True,
+    )
+class NoticeAttachmentInput(InputObjectType):
+    general_type = String(required=False)
+    type = String(required=False)
+    title = String(required=False)
+    date = Date(required=False)
+    filename = String(required=False)
+    mime = String(required=False)
+    url = String(required=False)
+    document = String(required=False)
+
 class CreateNoticeMutation(OpenIMISMutation):
     _mutation_module = "notice"
     _mutation_class = "CreateNoticeMutation"
 
     class Input(OpenIMISMutation.Input):
-        title = graphene.String(required=True)
-        description = graphene.String(required=True)
-        priority = graphene.String(required=True)
-        health_facility_id = graphene.Int(required=True)  
-        schedule_publish = graphene.Boolean(required=False)  # New field
-        publish_start_date = graphene.DateTime(required=False)  # New field
+        client_mutation_id = String(required=False)
+        client_mutation_label = String(required=False)
+        title = String(required=True)
+        description = String(required=True)
+        priority = String(required=True)
+        health_facility_id = Int(required=False, source='healthFacilityId')  # Map healthFacilityId to health_facility_id
+        schedule_publish = Boolean(required=False)
+        publish_start_date = Date(required=False)
+        attachments = List(NoticeAttachmentInput, required=False)
 
     @classmethod
     def async_mutate(cls, user, **data):
@@ -32,21 +59,41 @@ class CreateNoticeMutation(OpenIMISMutation):
                 raise ValidationError("Authentication required")
             if not user.has_perms(["notice.add_notice"]):
                 raise PermissionDenied("Unauthorized")
-
-            health_facility = HealthFacility.objects.get(id=data["health_facility_id"])
+            health_facility = None
+            if data.get('health_facility_id'):
+                health_facility = HealthFacility.objects.get(id=data.get("health_facility_id"))
             notice = Notice(
                 title=data["title"],
                 description=data["description"],
                 priority=data["priority"],
-                health_facility=health_facility,
-                schedule_publish=data.get("schedule_publish", False),  # Default to False if not provided
-                publish_start_date=data.get("publish_start_date"),  # Can be None if not provided
+                health_facility=health_facility if health_facility else None,
+                schedule_publish=data.get("schedule_publish", False),
+                publish_start_date=data.get("publish_start_date"),
             )
             notice.save()
-            return None  # Success, no errors
+            attachments_data = data.get("attachments", [])
+            from datetime import datetime
+            for attachment_data in attachments_data:
+                if not user.has_perms(["notice.add_notice_attachment"]):
+                    raise PermissionDenied("Unauthorized to add attachments")
+                document = attachment_data.get("document")
+                attachment = NoticeAttachment(
+                    notice=notice,
+                    general_type=attachment_data.get("general_type", "test"),
+                    type=attachment_data.get("type"),
+                    title=attachment_data.get("title"),
+                    date=attachment_data.get("date", datetime.now().date()),
+                    filename=attachment_data.get("filename"),
+                    mime=attachment_data.get("mime"),
+                    url=attachment_data.get("url"),
+                    document=document,
+                )
+                attachment.save()
+            #if health_facility and health_facility.email:
+            send_notice_email.delay(notice.id)                
         except Exception as exc:
             return [{
-                "message": "Failed to create notice",
+                "message": "Failed to create notice or attachments",
                 "detail": str(exc)
             }]
 
@@ -214,8 +261,6 @@ class SendNoticeSMSMutation(OpenIMISMutation):
             return [{"message": "Notice not found", "detail": str(data["uuid"])}]
         except Exception as exc:
             return [{"message": "Failed to send SMS", "detail": str(exc)}]
-
-
 
 
 class CreateNoticeAttachmentMutation(OpenIMISMutation):
